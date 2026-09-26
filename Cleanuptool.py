@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 
 ARCHIVE_EXTENSIONS = (".zip", ".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".xz")
-PROTECTED_FOLDER_NAMES = {"mods", "addons"}
 
 RED = "\033[91m"
 RESET = "\033[0m"
@@ -45,18 +44,34 @@ def find_archives(base: str):
     return hits
 
 
+def is_protected_name(name: str) -> bool:
+    lower = name.lower()
+    return "mod" in lower or "addon" in lower
+
+
 def find_empty_folders(base: str):
     empty = []
-    for dirpath, dirnames, filenames in os.walk(base, topdown=False):
-        remaining_subfolders = [
-            d for d in dirnames if Path(dirpath, d) not in empty
-        ]
-        if (
-            not filenames
-            and not remaining_subfolders
-            and Path(dirpath).name.lower() not in PROTECTED_FOLDER_NAMES
-        ):
-            empty.append(Path(dirpath))
+
+    def scan(path: str) -> bool:
+        has_content = False
+        try:
+            entries = list(os.scandir(path))
+        except OSError:
+            return True
+        for entry in entries:
+            if entry.is_dir(follow_symlinks=False):
+                if is_protected_name(entry.name):
+                    has_content = True
+                    continue
+                if scan(entry.path):
+                    has_content = True
+            else:
+                has_content = True
+        if not has_content:
+            empty.append(Path(path))
+        return has_content
+
+    scan(base)
     return [p for p in empty if str(p) != str(Path(base))]
 
 
