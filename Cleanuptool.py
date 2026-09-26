@@ -6,6 +6,11 @@ import time
 from pathlib import Path
 
 ARCHIVE_EXTENSIONS = (".zip", ".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".xz")
+PROTECTED_FOLDER_NAMES = {"mods", "addons"}
+
+RED = "\033[91m"
+RESET = "\033[0m"
+os.system("")
 
 try:
     import tkinter as tk
@@ -46,7 +51,11 @@ def find_empty_folders(base: str):
         remaining_subfolders = [
             d for d in dirnames if Path(dirpath, d) not in empty
         ]
-        if not filenames and not remaining_subfolders:
+        if (
+            not filenames
+            and not remaining_subfolders
+            and Path(dirpath).name.lower() not in PROTECTED_FOLDER_NAMES
+        ):
             empty.append(Path(dirpath))
     return [p for p in empty if str(p) != str(Path(base))]
 
@@ -99,7 +108,7 @@ def mode_delete_archives():
         print("\nDry run: nothing was deleted.")
         return
     if choice != "YES":
-        print("Cancelled. Nothing was deleted.")
+        print(f"{RED}Cancelled due to input '{choice}'. Nothing was deleted.{RESET}")
         return
 
     deleted, errors = 0, 0
@@ -137,7 +146,7 @@ def mode_delete_empty_folders():
         print("\nDry run: nothing was deleted.")
         return
     if choice != "YES":
-        print("Cancelled. Nothing was deleted.")
+        print(f"{RED}Cancelled due to input '{choice}'. Nothing was deleted.{RESET}")
         return
 
     deleted, errors = 0, 0
