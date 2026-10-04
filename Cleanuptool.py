@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 ARCHIVE_EXTENSIONS = (".zip", ".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".xz")
+INSTALLER_KEYWORDS = ("setup", "install")
 
 RED = "\033[91m"
 RESET = "\033[0m"
@@ -35,6 +36,21 @@ def find_archives(base: str):
     for dirpath, _, filenames in os.walk(base):
         for name in filenames:
             if name.lower().endswith(ARCHIVE_EXTENSIONS):
+                path = Path(dirpath) / name
+                try:
+                    size = path.stat().st_size
+                except OSError:
+                    size = 0
+                hits.append((path, size))
+    return hits
+
+
+def find_installers(base: str):
+    hits = []
+    for dirpath, _, filenames in os.walk(base):
+        for name in filenames:
+            lower = name.lower()
+            if lower.endswith(".exe") and any(k in lower for k in INSTALLER_KEYWORDS):
                 path = Path(dirpath) / name
                 try:
                     size = path.stat().st_size
@@ -138,6 +154,46 @@ def mode_delete_archives():
     print(f"\n{deleted} file(s) deleted, {errors} error(s).")
 
 
+def mode_delete_installers():
+    print(f"\nFiles ending in .exe containing: {', '.join(INSTALLER_KEYWORDS)}\n")
+    folder = choose_folder()
+    if not folder or not os.path.isdir(folder):
+        print("No valid folder selected. Aborting.")
+        return
+
+    print(f"\nScanning: {folder}\n")
+    installers = find_installers(folder)
+
+    if not installers:
+        print("No installer files found.")
+        return
+
+    total_bytes = sum(size for _, size in installers)
+    print(f"Found: {len(installers)} file(s), {format_size(total_bytes)} total\n")
+    for path, size in installers:
+        print(f"  {path}  ({format_size(size)})")
+
+    print()
+    choice = ask_confirmation()
+    if choice == "TEST":
+        print("\nDry run: nothing was deleted.")
+        return
+    if choice != "YES":
+        print(f"{RED}Cancelled due to input '{choice}'. Nothing was deleted.{RESET}")
+        return
+
+    deleted, errors = 0, 0
+    for path, _ in installers:
+        try:
+            os.remove(path)
+            deleted += 1
+        except OSError as e:
+            print(f"Error deleting {path}: {e}")
+            errors += 1
+
+    print(f"\n{deleted} file(s) deleted, {errors} error(s).")
+
+
 def mode_delete_empty_folders():
     folder = choose_folder()
     if not folder or not os.path.isdir(folder):
@@ -181,12 +237,15 @@ def main():
         print("=== Cleanup Tool ===\n")
         print("1) Delete archives (zip, rar, 7z, tar, gz, ...)")
         print("2) Delete empty folders")
-        choice = input("\nChoice (1/2): ").strip()
+        print("3) Delete installer files (setup.exe, installer.exe, ...)")
+        choice = input("\nChoice (1/2/3): ").strip()
 
         if choice == "1":
             mode_delete_archives()
         elif choice == "2":
             mode_delete_empty_folders()
+        elif choice == "3":
+            mode_delete_installers()
         else:
             print("Invalid choice.")
 
